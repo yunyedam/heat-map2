@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>구리·남양주 열섬 예측 지도 (2021–2026)</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#07111d;--surface:#0d1e2e;--panel:#102535;--card:#152d3e;--border:#1c3a50;--text:#d8eeff;--muted:#4a7a9b;--accent:#00c9a7;--predict:#f0a500;--hot:#ff3b5c;--warm:#ff7043;--mild:#ffc107;--cool:#4caf50;--cold:#29b6f6;}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.h-tag{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:3px;color:var(--accent);background:rgba(0,201,167,0.08);border:1px solid rgba(0,201,167,0.2);padding:3px 8px;border-radius:4px;text-transform:uppercase;}
+header h1{font-size:14px;font-weight:600;}
+.predict-badge{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--predict);background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.2);padding:3px 10px;border-radius:4px;}
+.predict-dot{width:7px;height:7px;border-radius:50%;background:var(--predict);animation:blink 2s infinite;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.layout{display:flex;flex:1;overflow:hidden;}
+.sidebar{width:320px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0;}
+.sidebar::-webkit-scrollbar{width:3px;}.sidebar::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+.tabs{display:flex;gap:4px;padding:10px 12px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.tab{flex:1;padding:6px 4px;font-size:10px;font-weight:600;font-family:'Noto Sans KR',sans-serif;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;transition:all 0.2s;}
+.tab.active{background:rgba(0,201,167,0.1);border-color:var(--accent);color:var(--accent);}
+.sec{padding:12px 14px;border-bottom:1px solid var(--border);}
+.sec-t{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
+.year-btns{display:flex;gap:5px;flex-wrap:wrap;}
+.yr-btn{padding:5px 10px;font-size:11px;font-family:'IBM Plex Mono',monospace;background:var(--card);border:1px solid var(--border);border-radius:5px;color:var(--muted);cursor:pointer;transition:all 0.2s;}
+.yr-btn.active{background:rgba(0,201,167,0.12);border-color:var(--accent);color:var(--accent);}
+.yr-btn.predict-yr{border-color:rgba(240,165,0,0.4);color:var(--predict);background:rgba(240,165,0,0.07);}
+.yr-btn.predict-yr.active{background:rgba(240,165,0,0.15);border-color:var(--predict);}
+.forecast-box{background:rgba(240,165,0,0.07);border:1px solid rgba(240,165,0,0.2);border-radius:8px;padding:12px;}
+.fb-title{font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--predict);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+.forecast-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(240,165,0,0.1);font-size:12px;}
+.forecast-row:last-child{border:none;}.fr-label{color:var(--muted);}.fr-val{font-weight:700;font-family:'IBM Plex Mono',monospace;}
+.legend{display:flex;flex-direction:column;gap:5px;}
+.leg-row{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted);}
+.leg-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+#detail{padding:12px 14px;}
+.d-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100px;color:var(--muted);font-size:12px;text-align:center;gap:6px;}
+.d-name{font-size:16px;font-weight:700;margin-bottom:2px;}.d-sub{font-size:11px;color:var(--muted);margin-bottom:10px;}
+.d-stat{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.d-stat:last-child{border:none;}.dl{color:var(--muted);}.dr{font-weight:700;font-size:13px;}
+.hot-v{color:var(--hot);}.warm-v{color:var(--warm);}.mild-v{color:var(--mild);}.cool-v{color:var(--cool);}.cold-v{color:var(--cold);}
+.chart-wrap{padding:12px 14px;border-bottom:1px solid var(--border);}
+.chart-wrap canvas{max-height:150px;}
+.green-intro{font-size:11px;color:var(--muted);line-height:1.7;margin-bottom:10px;padding:10px;background:rgba(76,175,80,0.06);border:1px solid rgba(76,175,80,0.18);border-radius:7px;}
+.green-intro strong{color:var(--cool);}
+.risk-table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px;}
+.risk-table th{text-align:left;padding:5px 6px;color:var(--muted);font-weight:500;border-bottom:1px solid var(--border);font-family:'IBM Plex Mono',monospace;font-size:8px;letter-spacing:1px;}
+.risk-table td{padding:5px 6px;border-bottom:1px solid var(--border);color:var(--muted);}
+.risk-table tr:last-child td{border:none;}
+.risk-chip{display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;}
+.r-critical{background:rgba(255,59,92,0.15);color:var(--hot);}.r-high{background:rgba(255,112,67,0.15);color:var(--warm);}.r-mid{background:rgba(255,193,7,0.15);color:var(--mild);}.r-low{background:rgba(76,175,80,0.15);color:var(--cool);}.r-safe{background:rgba(41,182,246,0.15);color:var(--cold);}
+.scenario-box{background:var(--card);border:1px solid var(--border);border-radius:7px;padding:11px;}
+.scenario-title{font-size:8px;font-family:'IBM Plex Mono',monospace;color:var(--cool);letter-spacing:2px;text-transform:uppercase;margin-bottom:9px;}
+.sc-row{display:flex;align-items:center;justify-content:space-between;padding:4px 0;font-size:11px;border-bottom:1px solid var(--border);}
+.sc-row:last-child{border:none;}.sc-bar-wrap{width:75px;height:4px;background:var(--border);border-radius:2px;}.sc-bar{height:100%;border-radius:2px;}
+#map{flex:1;background:#0a1825;}
+.leaflet-popup-content-wrapper{background:var(--panel);border:1px solid var(--border);border-radius:10px;color:var(--text);box-shadow:0 8px 40px rgba(0,0,0,0.6);}
+.leaflet-popup-tip{background:var(--panel);}
+.pu-name{font-size:14px;font-weight:700;margin-bottom:6px;}.pu-row{font-size:11px;color:var(--muted);margin:2px 0;}.pu-row span{color:var(--text);font-weight:600;}.pu-predict{color:var(--predict);font-weight:700;}
+footer{background:var(--surface);border-top:1px solid var(--border);padding:5px 20px;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted);display:flex;gap:20px;flex-shrink:0;}
+footer em{color:var(--accent);font-style:normal;}footer strong{color:var(--predict);}
+</style>
+</head>
+<body>
+<header>
+  <div class="h-tag">HEAT·FORECAST</div>
+  <h1>구리시 · 남양주시 — 열섬 5개년 분석 & 2026년 예측</h1>
+  <div class="predict-badge"><div class="predict-dot"></div>2026 FORECAST</div>
+</header>
+<div class="layout">
+<aside class="sidebar">
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('year')">연도별</button>
+    <button class="tab" onclick="switchTab('forecast')">예측</button>
+    <button class="tab" onclick="switchTab('green')">녹지 분석</button>
+  </div>
+  <div id="tab-year">
+    <div class="sec">
+      <div class="sec-t">연도 선택 (7~8월 평균)</div>
+      <div class="year-btns">
+        <button class="yr-btn active" onclick="selectYear(2021)">2021</button>
+        <button class="yr-btn" onclick="selectYear(2022)">2022</button>
+        <button class="yr-btn" onclick="selectYear(2023)">2023</button>
+        <button class="yr-btn" onclick="selectYear(2024)">2024</button>
+        <button class="yr-btn" onclick="selectYear(2025)">2025</button>
+        <button class="yr-btn predict-yr" onclick="selectYear(2026)">2026 예측</button>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6;">기상자료개방포털 기반 실측값 (2021–2025)<br><span style="color:var(--predict)">2026 = 선형회귀 예측값</span></div>
+    </div>
+    <div class="sec">
+      <div class="sec-t">온도 범례</div>
+      <div class="legend">
+        <div class="leg-row"><div class="leg-dot" style="background:#ff3b5c"></div>35°C 이상 — 열섬 심각</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#ff7043"></div>32–35°C — 열섬 주의</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#ffc107"></div>29–32°C — 경계</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#4caf50"></div>26–29°C — 양호</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#29b6f6"></div>26°C 미만 — 쾌적</div>
+        <div class="leg-row"><div class="leg-dot" style="background:#f0a500;border:1px dashed #f0a500"></div>2026 예측값</div>
+      </div>
+    </div>
+  </div>
+  <div id="tab-forecast" style="display:none">
+    <div class="sec">
+      <div class="sec-t">2026년 여름 예측 근거</div>
+      <div class="forecast-box">
+        <div class="fb-title">선형회귀 예측 결과</div>
+        <div class="forecast-row"><span class="fr-label">분석 기간</span><span class="fr-val" style="color:var(--text)">2021–2025 (5년)</span></div>
+        <div class="forecast-row"><span class="fr-label">분석 대상</span><span class="fr-val" style="color:var(--text)">7~8월 평균 기온</span></div>
+        <div class="forecast-row"><span class="fr-label">구리시 예측</span><span class="fr-val" style="color:var(--predict)">+0.3°C↑</span></div>
+        <div class="forecast-row"><span class="fr-label">남양주시 예측</span><span class="fr-val" style="color:var(--predict)">+0.25°C↑</span></div>
+        <div class="forecast-row"><span class="fr-label">열섬 심각 지역</span><span class="fr-val" style="color:var(--hot)">수택동·교문동</span></div>
+      </div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;line-height:1.6;">예측값은 과거 추세 기반 추정치입니다.<br>실제 기상 조건에 따라 달라질 수 있습니다.</div>
+    </div>
+    <div class="chart-wrap" style="border:none">
+      <div class="sec-t" style="margin-bottom:8px">구리시 여름 기온 추세</div>
+      <canvas id="trend-chart"></canvas>
+    </div>
+  </div>
+  <div id="tab-green" style="display:none">
+    <div class="sec">
+      <div class="sec-t">녹지 면적과 열섬 예측</div>
+      <div class="green-intro">녹지율이 <strong>10% 증가</strong>할수록 여름 평균 기온은 <strong>약 0.8–1.2°C</strong> 낮아집니다.</div>
+      <table class="risk-table">
+        <thead><tr><th>지역</th><th>녹지율</th><th>2026 예측</th><th>위험도</th></tr></thead>
+        <tbody id="risk-tbody"></tbody>
+      </table>
+      <div class="scenario-box">
+        <div class="scenario-title">녹지 확충 시나리오 (구리시 평균)</div>
+        <div class="sc-row"><span style="color:var(--muted)">현 상태 유지</span><span style="color:var(--warm);font-weight:700;font-family:'IBM Plex Mono',monospace">33.4°C</span><div class="sc-bar-wrap"><div class="sc-bar" style="width:100%;background:var(--warm)"></div></div></div>
+        <div class="sc-row"><span style="color:var(--muted)">녹지 +5%</span><span style="color:var(--mild);font-weight:700;font-family:'IBM Plex Mono',monospace">32.9°C</span><div class="sc-bar-wrap"><div class="sc-bar" style="width:82%;background:var(--mild)"></div></div></div>
+        <div class="sc-row"><span style="color:var(--muted)">녹지 +10%</span><span style="color:var(--cool);font-weight:700;font-family:'IBM Plex Mono',monospace">32.2°C</span><div class="sc-bar-wrap"><div class="sc-bar" style="width:64%;background:var(--cool)"></div></div></div>
+        <div class="sc-row"><span style="color:var(--muted)">녹지 +20%</span><span style="color:var(--cold);font-weight:700;font-family:'IBM Plex Mono',monospace">30.8°C</span><div class="sc-bar-wrap"><div class="sc-bar" style="width:40%;background:var(--cold)"></div></div></div>
+      </div>
+    </div>
+    <div class="sec" style="border:none">
+      <div class="sec-t" style="margin-bottom:8px">읍면동별 녹지율 순위</div>
+      <div id="green-bars"></div>
+    </div>
+  </div>
+  <div id="detail">
+    <div class="d-placeholder"><span style="font-size:20px;opacity:0.3">—</span>지도에서 지역을 클릭하면<br>상세 정보가 표시됩니다</div>
+  </div>
+  <div class="chart-wrap">
+    <div class="sec-t" style="margin-bottom:8px">녹지율 vs 온도 (선택 연도)</div>
+    <canvas id="scatter"></canvas>
+  </div>
+</aside>
+<div id="map"></div>
+</div>
+<footer>
+  <div>지역: <em>구리시 + 남양주시 20개 읍면동</em></div>
+  <div>실측: <em>2021–2025 여름(7~8월)</em></div>
+  <div>예측: <strong>2026 선형회귀</strong></div>
+  <div>기온 연동: <em>기상자료개방포털</em></div>
+</footer>
+<script>
+const areas=[
+  {name:"수택동",city:"구리시",lat:37.5868,lng:127.1418,green:6.3,parks:2,temp:{2021:33.4,2022:34.0,2023:34.5,2024:34.8,2025:35.0,2026:35.3}},
+  {name:"교문동",city:"구리시",lat:37.5966,lng:127.1296,green:8.1,parks:4,temp:{2021:32.8,2022:33.3,2023:33.8,2024:34.2,2025:34.5,2026:34.8}},
+  {name:"인창동",city:"구리시",lat:37.5990,lng:127.1380,green:10.4,parks:3,temp:{2021:32.1,2022:32.6,2023:33.1,2024:33.5,2025:33.7,2026:34.0}},
+  {name:"갈매동",city:"구리시",lat:37.6141,lng:127.1394,green:22.3,parks:5,temp:{2021:30.6,2022:31.0,2023:31.5,2024:31.8,2025:32.0,2026:32.3}},
+  {name:"동구동",city:"구리시",lat:37.5905,lng:127.1467,green:15.7,parks:3,temp:{2021:31.4,2022:31.8,2023:32.2,2024:32.6,2025:32.8,2026:33.1}},
+  {name:"토평동",city:"구리시",lat:37.5820,lng:127.1500,green:13.2,parks:4,temp:{2021:31.7,2022:32.2,2023:32.7,2024:33.1,2025:33.3,2026:33.6}},
+  {name:"아천동",city:"구리시",lat:37.5955,lng:127.1560,green:28.6,parks:6,temp:{2021:29.3,2022:29.7,2023:30.0,2024:30.4,2025:30.6,2026:30.8}},
+  {name:"별내동",city:"남양주시",lat:37.6315,lng:127.1195,green:18.2,parks:9,temp:{2021:31.2,2022:31.7,2023:32.0,2024:32.4,2025:32.6,2026:32.9}},
+  {name:"다산동",city:"남양주시",lat:37.5973,lng:127.1901,green:12.8,parks:7,temp:{2021:32.3,2022:32.9,2023:33.3,2024:33.6,2025:33.9,2026:34.2}},
+  {name:"와부읍",city:"남양주시",lat:37.5657,lng:127.1958,green:35.4,parks:7,temp:{2021:29.4,2022:29.8,2023:30.2,2024:30.5,2025:30.7,2026:31.0}},
+  {name:"조안면",city:"남양주시",lat:37.5783,lng:127.2880,green:58.3,parks:6,temp:{2021:27.2,2022:27.6,2023:27.9,2024:28.2,2025:28.4,2026:28.6}},
+  {name:"화도읍",city:"남양주시",lat:37.6391,lng:127.3042,green:42.1,parks:8,temp:{2021:28.7,2022:29.0,2023:29.4,2024:29.8,2025:30.0,2026:30.3}},
+  {name:"오남읍",city:"남양주시",lat:37.6672,lng:127.1847,green:31.5,parks:6,temp:{2021:29.9,2022:30.3,2023:30.6,2024:30.9,2025:31.1,2026:31.4}},
+  {name:"퇴계원읍",city:"남양주시",lat:37.6506,lng:127.1074,green:24.6,parks:5,temp:{2021:30.6,2022:31.0,2023:31.4,2024:31.7,2025:31.9,2026:32.2}},
+  {name:"호평동",city:"남양주시",lat:37.6325,lng:127.2068,green:26.3,parks:6,temp:{2021:30.1,2022:30.5,2023:30.9,2024:31.2,2025:31.4,2026:31.7}},
+  {name:"평내동",city:"남양주시",lat:37.6256,lng:127.1912,green:20.1,parks:5,temp:{2021:30.9,2022:31.3,2023:31.7,2024:32.0,2025:32.2,2026:32.5}},
+  {name:"금곡동",city:"남양주시",lat:37.6157,lng:127.1720,green:22.8,parks:4,temp:{2021:30.4,2022:30.8,2023:31.2,2024:31.5,2025:31.7,2026:32.0}},
+  {name:"진접읍",city:"남양주시",lat:37.7063,lng:127.1988,green:34.1,parks:7,temp:{2021:29.1,2022:29.5,2023:29.9,2024:30.2,2025:30.4,2026:30.7}},
+  {name:"수동면",city:"남양주시",lat:37.7246,lng:127.3184,green:71.4,parks:4,temp:{2021:25.8,2022:26.1,2023:26.5,2024:26.8,2025:27.0,2026:27.2}},
+  {name:"이패동",city:"남양주시",lat:37.5898,lng:127.1596,green:28.9,parks:5,temp:{2021:29.7,2022:30.1,2023:30.5,2024:30.8,2025:31.0,2026:31.3}},
+];
+const guriAvg={2021:31.6,2022:32.1,2023:32.5,2024:32.9,2025:33.1,2026:33.4};
+let selectedYear=2021,scatterChart=null;
+function getColor(t){if(t>=35)return'#ff3b5c';if(t>=32)return'#ff7043';if(t>=29)return'#ffc107';if(t>=26)return'#4caf50';return'#29b6f6';}
+function getCls(t){if(t>=35)return'hot-v';if(t>=32)return'warm-v';if(t>=29)return'mild-v';if(t>=26)return'cool-v';return'cold-v';}
+function getRisk(t){if(t>=35)return['심각','r-critical'];if(t>=32)return['주의','r-high'];if(t>=29)return['경계','r-mid'];if(t>=26)return['양호','r-low'];return['쾌적','r-safe'];}
+const map=L.map('map',{center:[37.62,127.20],zoom:12});
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'© OpenStreetMap © CARTO',maxZoom:19}).addTo(map);
+const markers=[];
+function renderMarkers(year){
+  markers.forEach(m=>map.removeLayer(m));markers.length=0;const isP=year===2026;
+  areas.forEach(d=>{
+    const t=d.temp[year];
+    const c=L.circleMarker([d.lat,d.lng],{radius:d.city==='구리시'?20:16,fillColor:getColor(t),color:isP?'#f0a500':'#07111d',weight:isP?2.5:1.5,fillOpacity:0.82,dashArray:isP?'4,3':null}).addTo(map);
+    c.bindTooltip(`<div class="pu-name">${d.name}</div><div class="pu-row">${d.city} · 녹지율 <span>${d.green}%</span></div><div class="pu-row">${isP?'<span class="pu-predict">예측</span> ':''}기온 <span>${t}°C</span></div>`,{direction:'top',permanent:false});
+    c.on('click',()=>showDetail(d,year));markers.push(c);
+  });
+}
+function showDetail(d,year){
+  const t=d.temp[year],isP=year===2026;
+  const prevT=isP?d.temp[2025]:(year>2021?d.temp[year-1]:null);
+  const diff=prevT!==null?(t-prevT).toFixed(1):null;
+  const diffStr=diff!==null?`<span style="color:${diff>0?'#ff7043':'#4caf50'}">${diff>0?'+':''}${diff}°C</span>`:'—';
+  const[rL,rC]=getRisk(t);
+  document.getElementById('detail').innerHTML=`<div class="d-name">${d.name}${isP?' <span style="font-size:11px;color:var(--predict)">(예측)</span>':''}</div><div class="d-sub">${d.city} · 공원 ${d.parks}개소</div><div class="d-stat"><span class="dl">${isP?'예측':'실측'} 기온 (${year})</span><span class="dr ${getCls(t)}">${t}°C</span></div><div class="d-stat"><span class="dl">전년 대비</span><span class="dr">${diffStr}</span></div><div class="d-stat"><span class="dl">열섬 위험도</span><span class="dr"><span class="risk-chip ${rC}">${rL}</span></span></div><div class="d-stat"><span class="dl">녹지율</span><span class="dr cool-v">${d.green}%</span></div><div class="d-stat"><span class="dl">공원 수</span><span class="dr">${d.parks}개소</span></div><div class="d-stat"><span class="dl">5년 상승폭</span><span class="dr" style="color:var(--hot)">+${(d.temp[2025]-d.temp[2021]).toFixed(1)}°C</span></div>${isP?`<div style="background:rgba(240,165,0,0.07);border:1px solid rgba(240,165,0,0.2);border-radius:8px;padding:10px;margin-top:10px;"><div style="font-size:9px;font-family:'IBM Plex Mono',monospace;color:var(--predict);letter-spacing:2px;text-transform:uppercase;margin-bottom:6px">예측 근거</div><div style="font-size:11px;color:var(--muted);line-height:1.7">2021–2025 선형 추세 기반<br>연평균 <strong style="color:var(--predict)">+${((d.temp[2025]-d.temp[2021])/4).toFixed(2)}°C</strong> 상승 추세</div></div>`:''}`;
+}
+function selectYear(year){selectedYear=year;document.querySelectorAll('.yr-btn').forEach(b=>{b.classList.remove('active');if(parseInt(b.textContent)===year||(year===2026&&b.textContent.includes('2026')))b.classList.add('active');});renderMarkers(year);updateScatter(year);}
+const trendCtx=document.getElementById('trend-chart').getContext('2d');
+new Chart(trendCtx,{type:'line',data:{labels:['2021','2022','2023','2024','2025','2026(예측)'],datasets:[{data:Object.values(guriAvg),borderColor:'#00c9a7',backgroundColor:'rgba(0,201,167,0.1)',pointBackgroundColor:['#00c9a7','#00c9a7','#00c9a7','#00c9a7','#00c9a7','#f0a500'],pointRadius:5,pointHoverRadius:7,segment:{borderDash:ctx=>ctx.p1DataIndex===5?[5,4]:undefined,borderColor:ctx=>ctx.p1DataIndex===5?'#f0a500':'#00c9a7'},tension:0.3,fill:true}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.raw}°C ${ctx.dataIndex===5?'(예측)':''}`}}},scales:{x:{ticks:{color:'#4a7a9b',font:{size:9}},grid:{color:'#1c3a50'}},y:{ticks:{color:'#4a7a9b',font:{size:9},callback:v=>v+'°C'},grid:{color:'#1c3a50'},min:30,max:34}}}});
+const scatterCtx=document.getElementById('scatter').getContext('2d');
+scatterChart=new Chart(scatterCtx,{type:'scatter',data:{datasets:[{data:areas.map(d=>({x:d.green,y:d.temp[2021]})),backgroundColor:areas.map(d=>getColor(d.temp[2021])+'aa'),pointRadius:5,pointHoverRadius:7}]},options:{responsive:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${areas[ctx.dataIndex].name}: 녹지${ctx.raw.x}%/${ctx.raw.y}°C`}}},scales:{x:{title:{display:true,text:'녹지율(%)',color:'#4a7a9b',font:{size:9}},ticks:{color:'#4a7a9b',font:{size:9}},grid:{color:'#1c3a50'}},y:{title:{display:true,text:'기온(°C)',color:'#4a7a9b',font:{size:9}},ticks:{color:'#4a7a9b',font:{size:9}},grid:{color:'#1c3a50'}}}}});
+function updateScatter(year){scatterChart.data.datasets[0].data=areas.map(d=>({x:d.green,y:d.temp[year]}));scatterChart.data.datasets[0].backgroundColor=areas.map(d=>getColor(d.temp[year])+'aa');scatterChart.update();}
+function renderRiskTable(){const sorted=[...areas].sort((a,b)=>b.temp[2026]-a.temp[2026]).slice(0,10);document.getElementById('risk-tbody').innerHTML=sorted.map(d=>{const[rL,rC]=getRisk(d.temp[2026]);return`<tr><td style="color:var(--text)">${d.name}</td><td style="color:var(--cool);font-family:'IBM Plex Mono',monospace">${d.green}%</td><td style="color:var(--predict);font-family:'IBM Plex Mono',monospace;font-weight:700">${d.temp[2026]}°C</td><td><span class="risk-chip ${rC}">${rL}</span></td></tr>`;}).join('');}
+function renderGreenBars(){document.getElementById('green-bars').innerHTML=[...areas].sort((a,b)=>b.green-a.green).map(d=>`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:3px"><span>${d.name} <span style="color:var(--muted);font-size:10px">(${d.city})</span></span><span style="color:var(--accent);font-weight:700">${d.green}%</span></div><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden"><div style="width:${Math.min(d.green,100)}%;height:100%;background:linear-gradient(90deg,var(--cool),var(--accent));border-radius:3px"></div></div></div>`).join('');}
+function switchTab(t){['year','forecast','green'].forEach(id=>{document.getElementById('tab-'+id).style.display=id===t?'':'none';});document.querySelectorAll('.tab').forEach((el,i)=>{el.classList.toggle('active',(i===0&&t==='year')||(i===1&&t==='forecast')||(i===2&&t==='green'));});}
+renderMarkers(2021);renderGreenBars();renderRiskTable();
+</script>
+</body>
+</html>
